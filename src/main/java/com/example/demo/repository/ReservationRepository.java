@@ -23,9 +23,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             "WHERE r.item.id = :id " +
             "AND NOT (r.endAt <= :startAt OR r.startAt >= :endAt) " +
             "AND r.status = 'APPROVED'")
-    List<Reservation> findConflictingReservations(
+
+    List<Reservation> findConflictingReservationsWithUserAndItem(
             @Param("id") Long id,
             @Param("startAt") LocalDateTime startAt,
             @Param("endAt") LocalDateTime endAt
     );
+
+    @Query("SELECT r FROM Reservation r " +
+            "JOIN FETCH r.item  i " +
+            "JOIN FETCH r.user u")
+
+    List<Reservation> findAllWithUserAndItem();
 }

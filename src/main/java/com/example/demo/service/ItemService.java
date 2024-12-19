@@ -23,6 +23,7 @@ public class ItemService {
         User manager = userRepository.findById(managerId).orElseThrow(() -> new IllegalArgumentException("해당 ID에 맞는 값이 존재하지 않습니다."));
 
         Item item = new Item(name, description, owner, manager);
+        item.setStatus("PENDING");
         itemRepository.save(item);
     }
 }

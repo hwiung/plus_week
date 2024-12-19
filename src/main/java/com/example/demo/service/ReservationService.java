@@ -1,14 +1,13 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.ReservationResponseDto;
-import com.example.demo.entity.Item;
-import com.example.demo.entity.RentalLog;
-import com.example.demo.entity.Reservation;
-import com.example.demo.entity.User;
+import com.example.demo.entity.*;
 import com.example.demo.exception.ReservationConflictException;
 import com.example.demo.repository.ItemRepository;
 import com.example.demo.repository.ReservationRepository;
 import com.example.demo.repository.UserRepository;
+import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,23 +23,33 @@ public class ReservationService {
     private final UserRepository userRepository;
     private final RentalLogService rentalLogService;
 
+    private final JPAQueryFactory queryFactory;
+    private final QReservation qReservation = QReservation.reservation;
+    private final QUser qUser = QUser.user;
+    private final QItem qItem = QItem.item;
+
     public ReservationService(ReservationRepository reservationRepository,
                               ItemRepository itemRepository,
                               UserRepository userRepository,
-                              RentalLogService rentalLogService) {
+                              RentalLogService rentalLogService,
+
+                              JPAQueryFactory queryFactory) {
         this.reservationRepository = reservationRepository;
         this.itemRepository = itemRepository;
         this.userRepository = userRepository;
         this.rentalLogService = rentalLogService;
+
+        this.queryFactory = queryFactory;
     }
 
     // TODO: 1. 트랜잭션 이해
+    @Transactional
     public void createReservation(Long itemId, Long userId, LocalDateTime startAt, LocalDateTime endAt) {
         // 쉽게 데이터를 생성하려면 아래 유효성검사 주석 처리
-        List<Reservation> haveReservations = reservationRepository.findConflictingReservations(itemId, startAt, endAt);
-        if(!haveReservations.isEmpty()) {
-            throw new ReservationConflictException("해당 물건은 이미 그 시간에 예약이 있습니다.");
-        }
+//        List<Reservation> haveReservations = reservationRepository.findConflictingReservations(itemId, startAt, endAt);
+//        if(!haveReservations.isEmpty()) {
+//            throw new ReservationConflictException("해당 물건은 이미 그 시간에 예약이 있습니다.");
+//        }
 
         Item item = itemRepository.findById(itemId).orElseThrow(() -> new IllegalArgumentException("해당 ID에 맞는 값이 존재하지 않습니다."));
         User user = userRepository.findById(userId).orElseThrow(() -> new IllegalArgumentException("해당 ID에 맞는 값이 존재하지 않습니다."));
@@ -53,20 +62,17 @@ public class ReservationService {
 
     // TODO: 3. N+1 문제
     public List<ReservationResponseDto> getReservations() {
-        List<Reservation> reservations = reservationRepository.findAll();
+        List<Reservation> reservations = reservationRepository.findAllWithUserAndItem();
 
-        return reservations.stream().map(reservation -> {
-            User user = reservation.getUser();
-            Item item = reservation.getItem();
-
-            return new ReservationResponseDto(
-                    reservation.getId(),
-                    user.getNickname(),
-                    item.getName(),
-                    reservation.getStartAt(),
-                    reservation.getEndAt()
-            );
-        }).toList();
+        return reservations.stream().map(reservation ->
+                new ReservationResponseDto(
+                        reservation.getId(),
+                        reservation.getUser().getNickname(),
+                        reservation.getItem().getName(),
+                        reservation.getStartAt(),
+                        reservation.getEndAt()
+                )
+        ).toList();
     }
 
     // TODO: 5. QueryDSL 검색 개선
@@ -79,16 +85,25 @@ public class ReservationService {
 
     public List<Reservation> searchReservations(Long userId, Long itemId) {
 
-        if (userId != null && itemId != null) {
-            return reservationRepository.findByUserIdAndItemId(userId, itemId);
-        } else if (userId != null) {
-            return reservationRepository.findByUserId(userId);
-        } else if (itemId != null) {
-            return reservationRepository.findByItemId(itemId);
-        } else {
-            return reservationRepository.findAll();
-        }
+        return queryFactory.selectFrom(qReservation)
+                .leftJoin(qReservation.user, qUser).fetchJoin()
+                .leftJoin(qReservation.item, qItem).fetchJoin()
+                .where(
+                        userIdCondition(userId),
+                        itemIdCondition(itemId)
+                )
+                .fetch();
     }
+
+    private BooleanExpression userIdCondition(Long userId) {
+        return userId != null ? qReservation.user.id.eq(userId) : null;
+    }
+
+    private BooleanExpression itemIdCondition(Long itemId) {
+        return itemId != null ? qReservation.item.id.eq(itemId) : null;
+    }
+
+
 
     private List<ReservationResponseDto> convertToDto(List<Reservation> reservations) {
         return reservations.stream()
