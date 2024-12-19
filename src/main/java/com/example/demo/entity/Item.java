@@ -28,9 +28,6 @@ public class Item {
     @JoinColumn(name = "manager_id")
     private User manager;
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
 
     @Column(nullable = false, columnDefinition = "varchar(20) default 'PENDING'")
     private String status;
@@ -42,5 +39,8 @@ public class Item {
         this.owner = owner;
     }
 
+    public void setStatus(String status) {
+        this.status = status;
+    }
     public Item() {}
 }

@@ -13,6 +13,9 @@ public class Reservation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
+    private ReservationStatus status;
+
     @ManyToOne
     @JoinColumn(name = "item_id")
     private Item item;
@@ -22,12 +25,9 @@ public class Reservation {
     private User user;
 
     private LocalDateTime startAt;
-
     private LocalDateTime endAt;
 
-    private String status; // PENDING, APPROVED, CANCELED, EXPIRED
-
-    public Reservation(Item item, User user, String status, LocalDateTime startAt, LocalDateTime endAt) {
+    public Reservation(Item item, User user, ReservationStatus status, LocalDateTime startAt, LocalDateTime endAt) {
         this.item = item;
         this.user = user;
         this.status = status;
@@ -37,7 +37,7 @@ public class Reservation {
 
     public Reservation() {}
 
-    public void updateStatus(String status) {
+    public void updateStatus(ReservationStatus status) {
         this.status = status;
     }
 }
